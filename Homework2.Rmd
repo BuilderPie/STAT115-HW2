@@ -486,8 +486,8 @@ samples. Hint: use library class and function knn.
 # your code here
 # BiocManager::install("caret")
 library(caret)
-pca_result <- taylor[genelist$gene, ] %>% t() %>% prcomp(center = TRUE, scale. = TRUE)
-pca_result.All <- taylor %>% t() %>% prcomp(center = TRUE, scale. = TRUE)
+# pca_result <- taylor[genelist$gene, ] %>% t() %>% prcomp(center = TRUE, scale. = TRUE)
+# pca_result.All <- taylor %>% t() %>% prcomp(center = TRUE, scale. = TRUE)
 
 print("For DE group")
 train_ind <- train_samps
@@ -530,7 +530,32 @@ samples. Hint: use library e1071 and function svm.
 
 ```{r part2-svm}
 # your code here
+library(e1071)
+print("Run SVM on the differential genes:")
+train_ind <- train_samps
+expr_train <- taylor[genelist$gene, train_ind]
+expr_test <- taylor[genelist$gene, -train_ind]
+type_train <- tumortype_all[train_ind]
+type_test <- tumortype_all[-train_ind]
+# get prediction for train dataset
+svm_result <- svm(t(expr_train), type_train, kernel = "linear")
+confusionMatrix(svm_result$fitted, type_train)$table
+# get prediction for test dataset
+preds <- predict(svm_result, t(expr_test))
+confusionMatrix(preds, type_test)$table
 
+print("Run SVM on all the samples:")
+train_ind <- train_samps
+expr_train.all <- taylor[, train_ind]
+expr_test.all <- taylor[, -train_ind]
+type_train.all <- tumortype_all[train_ind]
+type_test.all <- tumortype_all[-train_ind]
+# get prediction for train dataset
+svm_result.all <- svm(t(expr_train.all), type_train.all, kernel = "linear")
+confusionMatrix(svm_result.all$fitted, type_train.all)$table
+# get prediction for test dataset
+preds.all <- predict(svm_result.all, t(expr_test.all))
+confusionMatrix(preds.all, type_test.all)$table
 ```
 
 9. FOR GRADUATES: Implement a 3-fold cross validation on your SVM
@@ -539,6 +564,24 @@ average (of 3) classification error rate on the training data?
 
 ```{r part2-cv}
 # your code here
+shuffle_inds <- sample(1:nrow(t(expr_train)), replace = FALSE)
+svm_tune <- tune(svm, t(expr_train)[shuffle_inds, ], type_train[shuffle_inds],
+                 kernel = "linear",
+                 ranges = list(cost = c(0.01, 0.1, 1, 10)),
+                 tunecontrol = tune.control(cross = 3))
+plot(svm_tune)
+svm_tune
+print(paste("(DE group) The average classification error rate on the training data is: ", sprintf("%.5f", mean(svm_tune$performances[, "error"]))))
+#===========================#
+shuffle_inds <- sample(1:nrow(t(expr_train)), replace = FALSE)
+svm_tune.all <- tune(svm, t(expr_train.all)[shuffle_inds, ], type_train.all[shuffle_inds],
+                 kernel = "linear",
+                 ranges = list(cost = c(0.01, 0.1, 1, 10)),
+                 tunecontrol = tune.control(cross = 3))
+plot(svm_tune.all)
+svm_tune.all
+print(paste("(All genes group) The average classification error rate on the training data is: ", sprintf("%.5f", mean(svm_tune.all$performances[, "error"]))))
+# confusionMatrix(svm_tune$fitted, type_train[shuffle_inds])$table
 ```
 
 # Part III. High throughput sequencing read mapping
